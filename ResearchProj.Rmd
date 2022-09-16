@@ -1,0 +1,157 @@
+---
+title: "Research Project - Cereals"
+author: "Nicholas Kaw"
+date: "12/10/2021"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+
+```{css, echo = FALSE}
+
+table, td, th {
+  border: none;
+  padding-left: 1em;
+  padding-right: 1em;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+For this research project, I managed to stumble upon an interesting data set about cereals. I found this on Kaggle (https://www.kaggle.com/crawford/80-cereals), but it is also available as a built in data set in the plspm package. However, this data set is originally from StatLib during a 1993 Statistical Graphics Exposition (http://lib.stat.cmu.edu/datasets/1993.expo/). This is a cross-sectional data set that contains information of 77 cereal brands, its manufacturer, whether it is eaten cold or hot, its nutritional information, what shelf level it is found on, the amount per serving, and rating of the cereal. 
+
+One caveat of the original data set is the rating variable. It seems that the original authors are not certain of how rating is obtained or what type of rating is measured. Another problem is that there are some observations that are missing values filled in with a $-1$. Also, there are very little hot cereals listed in the data set. Because of this, I decided to remove the observations with missing values and hot cereals from my experiment since it is negligible. 
+
+Thus, I am interested in estimating the relationship between *rating* and the main nutritional components that usually appear in cereals. Namely, *sugars*, *sodium*, *fiber*, *potassium*, and *calories*. Both *sugars* and *sodium* are considered as "nutrients to get less of", and *fiber* and *potassium* are considered as "nutrients to get more of", according to the FDA. On the other hand, *calories* is a measure of how much energy you can get per serving. Although the information of the *rating* variable is unclear, I am going to assume that it measures the rating in terms of its nutritional information. In other words, how "good" or "not so good" a cereal is based on its nutritional benefits. And throughout this study, we will keep assuming that this is the case for the rating variable. 
+
+### Summary Statistics
+
+Here is an overall summary of the of all of the variables in the data set. The first is a summary of the raw data set, the second is a summary after removing some observations and selecting the variables I will be focusing on for my regression. 
+
+```{r}
+library(tidyverse)
+library(stargazer)
+library(AER)
+```
+
+```{r, results="asis", message=FALSE, echo=FALSE}
+cereal <- read.csv("cereal.csv")
+summary(cereal)
+cereal <- filter(cereal, carbo>=0, sugars>=0, potass>=0, type == "C")
+cereal <- mutate(cereal, lcalories = log(calories))
+cereal <- select(cereal, name, lcalories, sodium, fiber, sugars, potass, rating)
+summary(cereal)
+```
+
+Here is a more visually appealing summary in a table format. This is a summary of the cleaned data set.
+
+```{r}
+stargazer(title = "Summary Statistics", as.data.frame(cereal), type = "text", digits = 2,
+                 summary.stat = c("n", "mean", "sd", "median", "min", "max"))
+```
+
+## Main Analysis
+
+The first regression is a Simple Linear Regression. Here the equation regresses *rating* only on *sugars*, where sugars is measured in grams. I decided to use *sugars* as my main independent variable because it is the easiest to intuitively understand. I may not be a nutrition expert, but to my knowledge, the amount of sugars on a nutrition facts label is an easy sign of unhealthy adversely affects a persons health
+
+The second regression is a Multiple Linear Regression. Here we add in *sodium*, *fiber*, *potassium*, and logged *calories*. *Sodium* is measured in milligrams. *Fiber* is measured in grams. *Potassium* is measured in milligrams. And *calories* is measured as per serving. Calories is logged because there is no meaningful 0 of calories compared to other variables in this data set. Calories do have a meaningful zero, which would be something like water, but cereals tend to normally have at least 1 calorie per serving. Also, logging would make a more normal distribution of the data since it takes relative differences. Logging would also change non-linear factors into linear scale, since it looks at relative differences, which we can perform linear regressions with.
+
+```{r}
+one.lm = lm(rating ~ sugars, data = cereal)
+two.lm = lm(rating ~ sugars + sodium + fiber + potass + lcalories, data = cereal)
+```
+
+```{r, results="asis", message=FALSE}
+stargazer(one.lm, two.lm, type = "html", omit.table.layout = "n", omit.stat ="ser")
+```
+### Scatter Plot
+
+Here is a scatter plot of the Simple Linear Regression. With number of sugars on the x axis, and rating of the cereal on the y axis
+
+```{r}
+plot(cereal$sugars, cereal$rating, xlab="Number of Sugars (in grams)",ylab="Cereal Rating",col="dark green") 
+abline(one.lm,col="blue")
+```
+
+## Six Assumptions
+
+### Assumption 1
+
+This assumption assumes that in the population, the relationship between the dependent and independent variables are linear. 
+
+I believe that this assumption holds for this data set. The population in this data set would be every cold cereal in the world. The dependent variable we are measuring is the cereal's rating in terms of its nutritional information. In general, there are cases of non-linearity in nutrition. For example, too much *fiber* or too much *potassium* can adversely affect an individuals health. But since we are focusing on only the population of cold cereals, we can assume that there is only linear relationships between the independent variables and dependent variables
+
+Also, not logged calories would violate this assumption. Calories initially had a non-linear relationship in the data set, which violates the assumption of linearity in the population. But after logging calories it transforms a non-linear factor into a linear one, since it looks at relative differences, which we can perform linear regressions with.
+
+### Assumption 2
+
+This assumption assumes that the data represents a random sample drawn from the population.
+
+It is difficult to truly assume that this assumption holds for this data set. There is a possibility that the original authors just went to one or two big box retail stores and wrote down the nutritional information of all the different types of cereal that they could find. This is because in the original data set there is a variable called *shelf*, which reports what shelf-level the cereal was found on. However, since we have established that the population in this context would be every cold cereal in the world, then we can say that this set of observations is randomly sampled from the population. Thus, this assumption holds for the data set.
+
+### Assumption 3
+
+This assumption assumes that none of the independent variables are constants and no perfect collinearity. No perfect collinearity means that independent variables are perfectly correlated (correlation between $x_1$ and $x_2$ is one) to other independent variables. 
+
+In the Multiple Linear Regression, it shows that each of the independent variables are not constants, meaning that there are different values of *sugars*, *sodium*, *fiber*, etc. Also, none of the independent variables are perfectly collinear, meaning that we cannot draw perfect linear relationships between the independent variables. So, this assumption holds for this data set.
+
+### Assumption 4
+
+Explain the assumption and whether you think it holds for your data set. This is the most important assumption to think about. If you don't think this assumption is true, what are your ideas for how you could fix this problem in a future research project? You don't have to try and implement your solution for this project.
+
+This assumption assumes zero conditional mean. Which means that the average value of the unobserved factors, conditional on all independent variables, equals to zero. This means that the value of the explanatory variables must contain no information about the mean of the unobserved factors.
+
+I believe that this assumption is violated for this data set. One reason is that *calories* can be associated with many other nutritional factors. This includes *fats*, *carbohydrates*, *protein*, and other variables that I decided not to include in my regression from the original data set.
+
+A possible solution to this problem would be to include the variables that were left out in another regression. Then this assumption may possibly hold. However, one caveat of doing this would be increasing our standard errors, due to introducing more multicollinearity between all of the independent variables in the regression. Another solution to this problem would be to increase our sample size, and assume the weaker version of this assumption to hold true. Since right now, 73 observations is not quite enough data needed to satisfy the weaker version of this assumption.
+
+### Assumption 5
+
+Explain the assumption and whether you think it holds for your data set. It is easy to test this assumption. Just do it for one of your regressions (best to do it for the one with the most x variables). See R Day #12b for more details.
+
+This assumption assumes homoskedasticity. Which means that the variance of the unobserved factors, conditional on all independent variables, is a constant. This means that value of the explanatory variables must contain no information about the mean of the unobserved factors.
+
+```{r, message=FALSE}
+bptest(two.lm)
+```
+
+I used a Breusch-Pagan test to test for heteroskedasticity. Since the p-value of this test is greater than 0.05, we fail to reject the null hypothesis of homoskedasticity. This means that this assumption holds for this data set. 
+
+### Assumption 6
+
+Explain the assumption and whether you think it holds for your data set. For assumption 6, plot a histogram of your residuals with a normal distribution on top and see if they match. See R Day #9 for an example.
+
+This assumption assumes that the unobserved factors are normally distributed for each independent variable individually. 
+
+```{r}
+residuals <- resid(two.lm)
+steps <- (max(residuals)-min(residuals))/100
+
+hist(residuals,freq=F)
+lines(seq(min(residuals), max(residuals), by=steps), dnorm(seq(min(residuals), max(residuals), by=steps), 0, sd(residuals)), col="dark green")
+```
+
+The histogram shows that the residuals are not normally distributed. We see that the most of the residuals appear around 0 and 5. There are also  parts of the graph that are way below the normal curve (represented by a green line). In short, this assumption is violated.
+
+One solution to satisfy this assumption is to obtain more data. This is mainly because of the Central Limit Theorem. As we increase the sample size that we have, the more normally distributed the mean of sample becomes.
+
+If this assumption is violated, what can you do about it?
+
+## Conclusion
+
+In the conclusion, state what you have learnt from this research project. What questions remain unanswered?
+
+As a result, all but assumptions 4 and 6 of the Classical Linear Model are satisfied. Our coefficient estimates are biased, therefore our standard errors, t-ratios, and p-values, are all biased as well. A question that remains unanswered is, is there ever a way to accurately pin point causation between the rating of a cereal by its nutritional health factors?
+
+For this research project, I have learned that it is extremely easy to assume that your stance is correct for any of the six Classical Linear Regression assumptions. However, it is also extremely difficult to accurately prove all six assumptions. I now understand how a lot of argument may arise from economists, statisticians, and other peoples having different point of views on a statement.
+
